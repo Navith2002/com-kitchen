@@ -86,8 +86,8 @@ function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax, lineColor = 
             dataKey={yKey}
             stroke={lineColor}
             strokeWidth={2}
-            dot={{ r: 3.2, strokeWidth: 1.2, stroke: '#fff', fill: dotColor }}
-            activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: dotColor }}
+            dot={{ r: 4, strokeWidth: 1.6, stroke: '#2f3437', fill: '#ffffff' }}
+            activeDot={{ r: 4.6, strokeWidth: 1.8, stroke: '#2f3437', fill: '#ffffff' }}
             connectNulls
           />
         </ComposedChart>
