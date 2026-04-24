@@ -4,22 +4,17 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
-  Scatter,
-  ScatterChart,
   ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  ZAxis,
 } from 'recharts';
 import Panel from '../../components/common/Panel';
 import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import SensorTable from '../../components/common/SensorTable';
 import useTempHumData from '../../hooks/useTempHumData';
-import useFireData from '../../hooks/useFireData';
-import useFridgeData from '../../hooks/useFridgeData';
 import { formatChartTime, formatShortTime } from '../../utils/formatters';
 
 const MONTH_OPTIONS = [
@@ -204,19 +199,6 @@ function buildHourlyAverages(history = [], monthValue, dayValue, yKey) {
   }));
 }
 
-function getNumericValue(item, keys = []) {
-  for (const key of keys) {
-    const value = Number(item?.[key]);
-    if (!Number.isNaN(value)) return value;
-  }
-  return null;
-}
-
-function statusToBinary(statusValue) {
-  const text = String(statusValue || '').toLowerCase();
-  return text.includes('open') || text === '1' || text === 'true' ? 1 : 0;
-}
-
 function filterHistoryByMonthDay(rows = [], monthValue, dayValue) {
   return rows.filter((item) => {
     const date = getHistoryEntryDate(item);
@@ -226,85 +208,77 @@ function filterHistoryByMonthDay(rows = [], monthValue, dayValue) {
   });
 }
 
-function buildCorrelationRows({ mode, tempHistory = [], fireHistory = [], fridgeHistory = [] }) {
-  const filteredTemp = tempHistory.slice(-180);
-  const filteredFire = fireHistory.slice(-180);
-  const filteredFridge = fridgeHistory.slice(-180);
+const HEATMAP_HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  if (mode === 'temp_fire') {
-    const pairedLength = Math.min(filteredTemp.length, filteredFire.length);
-    return Array.from({ length: pairedLength }, (_, index) => {
-      const tempItem = filteredTemp[index];
-      const fireItem = filteredFire[index];
-      const xValue = Number(tempItem?.temperature);
-      const yValue = getNumericValue(fireItem, ['flame_intensity', 'fireProbability', 'fireValue']);
-
-      if (Number.isNaN(xValue) || yValue === null) return null;
-
-      return {
-        x: Number(xValue.toFixed(2)),
-        y: Number(yValue.toFixed(2)),
-        z: 18,
-        time: formatChartTime(getHistoryEntryDate(tempItem)),
-      };
-    }).filter(Boolean);
-  }
-
-  const pairedLength = Math.min(filteredTemp.length, filteredFridge.length);
-  return Array.from({ length: pairedLength }, (_, index) => {
-    const tempItem = filteredTemp[index];
-    const fridgeItem = filteredFridge[index];
-    const xValue = Number(tempItem?.humidity);
-    const statusRaw = fridgeItem?.status ?? fridgeItem?.door_status ?? fridgeItem?.doorStatus;
-    const yValue = statusToBinary(statusRaw);
-
-    if (Number.isNaN(xValue)) return null;
-
-    return {
-      x: Number(xValue.toFixed(2)),
-      y: yValue,
-      z: 18,
-      statusLabel: yValue ? 'OPEN' : 'CLOSED',
-      time: formatChartTime(getHistoryEntryDate(tempItem)),
-    };
-  }).filter(Boolean);
+function getHeatClass(value) {
+  if (value == null) return 'none';
+  if (value < 20) return 'cool';
+  if (value < 28) return 'mild';
+  if (value < 35) return 'warm';
+  return 'hot';
 }
 
-function CorrelationScatter({ data = [], mode = 'temp_fire' }) {
-  const isFire = mode === 'temp_fire';
-  const xLabel = isFire ? 'Temperature (°C)' : 'Humidity (%)';
-  const yLabel = isFire ? 'Fire Intensity' : 'Fridge Door (0 Closed / 1 Open)';
-  const yDomain = isFire ? ['auto', 'auto'] : [-0.2, 1.2];
+function buildTempHeatMap(history = []) {
+  const buckets = Array.from({ length: 7 }, () => (
+    Object.fromEntries(HEATMAP_HOURS.map((hour) => [hour, { sum: 0, count: 0 }]))
+  ));
 
+  history.forEach((item) => {
+    const date = getHistoryEntryDate(item);
+    if (!date) return;
+
+    const value = Number(item?.temperature);
+    if (Number.isNaN(value)) return;
+
+    const dayIdx = date.getDay();
+    const hourBucket = Math.floor(date.getHours() / 3) * 3;
+
+    if (buckets[dayIdx]?.[hourBucket]) {
+      buckets[dayIdx][hourBucket].sum += value;
+      buckets[dayIdx][hourBucket].count += 1;
+    }
+  });
+
+  return DAY_LABELS.map((dayLabel, dayIdx) => ({
+    dayLabel,
+    slots: HEATMAP_HOURS.map((hour) => {
+      const bucket = buckets[dayIdx][hour];
+      const avg = bucket.count ? Number((bucket.sum / bucket.count).toFixed(1)) : null;
+      return { hour, value: avg, heatClass: getHeatClass(avg) };
+    }),
+  }));
+}
+
+function TemperatureHeatMap({ rows = [] }) {
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <ScatterChart margin={{ top: 8, right: 10, bottom: 8, left: 0 }}>
-        <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
-        <XAxis type="number" dataKey="x" name={xLabel} tick={{ fontSize: 10 }} />
-        <YAxis type="number" dataKey="y" name={yLabel} tick={{ fontSize: 10 }} domain={yDomain} />
-        <ZAxis type="number" dataKey="z" range={[18, 18]} />
-        <Tooltip
-          cursor={{ strokeDasharray: '3 3' }}
-          formatter={(value, key, payload) => {
-            if (!isFire && key === 'y') return [payload?.payload?.statusLabel || value, 'Door Status'];
-            return [value, key === 'x' ? xLabel : yLabel];
-          }}
-          labelFormatter={() => ''}
-        />
-        <Scatter data={data} fill="#1f2937" />
-      </ScatterChart>
-    </ResponsiveContainer>
+    <div className="th-heatmap">
+      <div className="th-heatmap-row th-heatmap-header">
+        <div className="th-heatmap-day-cell" />
+        {HEATMAP_HOURS.map((hour) => <div key={hour} className="th-heatmap-time-cell">{`${String(hour).padStart(2, '0')}:00`}</div>)}
+      </div>
+
+      {rows.map((row) => (
+        <div className="th-heatmap-row" key={row.dayLabel}>
+          <div className="th-heatmap-day-cell">{row.dayLabel}</div>
+          {row.slots.map((slot) => (
+            <div
+              key={`${row.dayLabel}-${slot.hour}`}
+              className={`th-heatmap-cell ${slot.heatClass}`}
+              title={`${row.dayLabel} ${String(slot.hour).padStart(2, '0')}:00 • ${slot.value ?? '--'} °C`}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 
 export default function TemperatureHumidityPage() {
   const { latest, history, loading } = useTempHumData();
-  const { history: fireHistory, loading: fireLoading } = useFireData();
-  const { history: fridgeHistory, loading: fridgeLoading } = useFridgeData();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
   const [selectedDate, setSelectedDate] = useState(String(now.getDate()).padStart(2, '0'));
-  const [correlationMode, setCorrelationMode] = useState('temp_fire');
 
   const forecastRows = useMemo(() => buildTimeSeriesForecast(history, latest?.temperature), [history, latest?.temperature]);
 
@@ -317,15 +291,7 @@ export default function TemperatureHumidityPage() {
     () => buildHourlyAverages(history, selectedMonth, selectedDate, 'temperature'),
     [history, selectedMonth, selectedDate],
   );
-  const correlationRows = useMemo(
-    () => buildCorrelationRows({
-      mode: correlationMode,
-      tempHistory: history,
-      fireHistory,
-      fridgeHistory,
-    }),
-    [correlationMode, history, fireHistory, fridgeHistory],
-  );
+  const heatMapRows = useMemo(() => buildTempHeatMap(history), [history]);
 
   if (loading) return <LoadingState label="Loading temperature and humidity dashboard..." />;
   if (!latest) return <EmptyState label="No temperature and humidity data available." />;
@@ -456,22 +422,8 @@ export default function TemperatureHumidityPage() {
             warnMax={32}
           />
         </Panel>
-        <Panel
-          title="Correlation Map"
-          action={(
-            <select
-              className="filter-select filter-select-small"
-              value={correlationMode}
-              onChange={(event) => setCorrelationMode(event.target.value)}
-            >
-              <option value="temp_fire">Temp ↔ Fire</option>
-              <option value="hum_fridge">Humidity ↔ Fridge Door</option>
-            </select>
-          )}
-        >
-          {!fireLoading && !fridgeLoading && correlationRows.length
-            ? <CorrelationScatter data={correlationRows} mode={correlationMode} />
-            : <div className="alerts-empty">No correlation data for selected date.</div>}
+        <Panel title="Temperature Heat Map (Time vs Day)">
+          <TemperatureHeatMap rows={heatMapRows} />
         </Panel>
       </div>
 
