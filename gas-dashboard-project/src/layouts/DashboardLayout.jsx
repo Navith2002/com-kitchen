@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/common/Sidebar';
 import Topbar from '../components/common/Topbar';
 import { pageTitles } from '../utils/constants';
+import AnalyticsChatbot from '../components/common/AnalyticsChatbot';
 
 export default function DashboardLayout() {
   const location = useLocation();
@@ -16,6 +17,7 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <AnalyticsChatbot />
     </div>
   );
 }
