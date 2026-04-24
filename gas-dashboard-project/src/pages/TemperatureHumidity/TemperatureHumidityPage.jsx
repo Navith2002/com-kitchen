@@ -163,8 +163,8 @@ export default function TemperatureHumidityPage() {
 
   const latestTemp = Number(latest.temperature || 0);
   const latestHumidity = Number(latest.humidity || 0);
-  const recentRows = [...history].reverse().slice(0, 4);
-  const forecastRows = buildTempForecast(history, latestTemp);
+  const recentRows = [...historyData].reverse().slice(0, 4);
+  const forecastRows = buildTempForecast(historyData, latestTemp);
   const crossing = forecastRows.find((row) => row.temperature >= 38);
   const availableMonths = useMemo(
     () => [...new Set(history.map((item) => parseTimestamp(item.timestamp)?.getMonth() + 1).filter(Boolean))].sort((a, b) => a - b),
