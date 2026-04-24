@@ -1,6 +1,4 @@
 import {
-  Area,
-  CartesianGrid,
   ComposedChart,
   Line,
   ReferenceArea,
@@ -11,30 +9,72 @@ import {
 } from 'recharts';
 import { formatChartTime } from '../../utils/formatters';
 
-export default function TrendChart({ data, xKey, yKey, safeMax = 330, warnMax = 500, maxY = 700 }) {
-  const chartData = data.map((item) => ({
+function formatGasAxisTime(value) {
+  return formatChartTime(value).replace(':', '.');
+}
+
+function buildTicks(totalPoints, tickCount = 6) {
+  if (totalPoints <= 1) return [0];
+  const step = (totalPoints - 1) / (tickCount - 1);
+  return Array.from({ length: tickCount }, (_, idx) => Math.round(idx * step));
+}
+
+export default function TrendChart({ data, xKey, yKey, maxY = 16 }) {
+  const chartData = data.map((item, index) => ({
     ...item,
-    chartTime: formatChartTime(item[xKey]),
+    index,
+    chartTime: formatGasAxisTime(item[xKey]),
   }));
 
+  if (!chartData.length) return null;
+
+  const zoneEdgeOne = Math.max(0, Math.floor((chartData.length - 1) / 3));
+  const zoneEdgeTwo = Math.max(zoneEdgeOne, Math.floor(((chartData.length - 1) * 2) / 3));
+  const lastIndex = chartData.length - 1;
+  const xTicks = buildTicks(chartData.length);
+
   return (
-    <div className="chart-box">
+    <div className="chart-box gas-zone-chart">
       <ResponsiveContainer width="100%" height={240}>
-        <ComposedChart data={chartData}>
-          <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
-          <XAxis dataKey="chartTime" tick={{ fontSize: 11 }} />
-          <YAxis domain={[0, maxY]} tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <ReferenceArea y1={0} y2={safeMax} fill="#cfe7ca" fillOpacity={0.9} />
-          <ReferenceArea y1={safeMax} y2={warnMax} fill="#dcccae" fillOpacity={0.8} />
-          <ReferenceArea y1={warnMax} y2={maxY} fill="#e7caca" fillOpacity={0.85} />
-          <Line type="monotone" dataKey={yKey} stroke="#3b3b3b" strokeWidth={1.4} dot={false} />
+        <ComposedChart data={chartData} margin={{ top: 6, right: 8, left: -8, bottom: 14 }}>
+          <ReferenceArea x1={0} x2={zoneEdgeOne} fill="#567452" fillOpacity={0.95} />
+          <ReferenceArea x1={zoneEdgeOne} x2={zoneEdgeTwo} fill="#d2a068" fillOpacity={0.95} />
+          <ReferenceArea x1={zoneEdgeTwo} x2={lastIndex} fill="#b44f4f" fillOpacity={0.95} />
+
+          <XAxis
+            dataKey="index"
+            type="number"
+            domain={[0, lastIndex]}
+            ticks={xTicks}
+            tickFormatter={(tick) => chartData[Math.min(lastIndex, Math.max(0, Math.round(tick)))]?.chartTime || '--'}
+            tick={{ fontSize: 11, fill: '#8b8b8b' }}
+            tickLine={false}
+            axisLine={{ stroke: '#1f1f1f', strokeWidth: 1.5 }}
+            dy={8}
+          />
+
+          <YAxis
+            domain={[0, maxY]}
+            ticks={[0, 5, 10, 15]}
+            tick={{ fontSize: 11, fill: '#8b8b8b' }}
+            tickLine={false}
+            axisLine={false}
+            width={28}
+          />
+
+          <Tooltip
+            formatter={(value) => [`${value}`, 'Gas Value']}
+            labelFormatter={(value) => chartData[value]?.chartTime || '--'}
+          />
+
+          <Line type="monotone" dataKey={yKey} stroke="#f4f4f4" strokeWidth={1.8} dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
-      <div className="chart-zone-labels">
-        <span className="danger-text">Danger</span>
-        <span className="warning-text">Warning</span>
-        <span className="safe-text">Safe</span>
+
+      <div className="chart-zone-overlay">
+        <span className="zone safe">Safe</span>
+        <span className="zone warning">Warning</span>
+        <span className="zone danger">Danger</span>
       </div>
     </div>
   );
