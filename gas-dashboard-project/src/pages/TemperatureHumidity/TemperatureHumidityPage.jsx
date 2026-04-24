@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import {
   CartesianGrid,
@@ -15,6 +16,26 @@ import EmptyState from '../../components/common/EmptyState';
 import SensorTable from '../../components/common/SensorTable';
 import useTempHumData from '../../hooks/useTempHumData';
 import { formatChartTime, formatShortTime } from '../../utils/formatters';
+
+const MONTH_OPTIONS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => {
+  const day = String(index + 1).padStart(2, '0');
+  return { value: day, label: String(index + 1) };
+});
 
 function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle = '' }) {
   const clamped = Math.max(min, Math.min(max, Number(value) || 0));
@@ -37,42 +58,145 @@ function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle 
 }
 
 function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax }) {
-  const chartData = data.map((item) => ({
-    ...item,
-    chartTime: formatChartTime(item.timestamp),
-  }));
-
   return (
-    <ResponsiveContainer width="100%" height={190}>
-      <ComposedChart data={chartData}>
-        <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
-        <XAxis dataKey="chartTime" tick={{ fontSize: 10 }} />
-        <YAxis domain={[0, maxY]} tick={{ fontSize: 10 }} />
-        <Tooltip />
-        <ReferenceArea y1={0} y2={safeMax} fill="#c7dfc0" fillOpacity={0.95} />
-        <ReferenceArea y1={safeMax} y2={warnMax} fill="#ddd2b3" fillOpacity={0.9} />
-        <ReferenceArea y1={warnMax} y2={maxY} fill="#e4c4c4" fillOpacity={0.9} />
-        <Line type="monotone" dataKey={yKey} stroke="#333" strokeWidth={1.2} dot={false} />
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div className="th-trend-chart-narrow">
+      <ResponsiveContainer width="100%" height={180}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+          <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
+          <XAxis dataKey="hourLabel" tick={{ fontSize: 10 }} />
+          <YAxis domain={[0, maxY]} tick={{ fontSize: 10 }} />
+          <Tooltip />
+          <ReferenceArea y1={0} y2={safeMax} fill="#c7dfc0" fillOpacity={0.95} />
+          <ReferenceArea y1={safeMax} y2={warnMax} fill="#ddd2b3" fillOpacity={0.9} />
+          <ReferenceArea y1={warnMax} y2={maxY} fill="#e4c4c4" fillOpacity={0.9} />
+          <Line type="monotone" dataKey={yKey} stroke="#333" strokeWidth={1.2} dot={false} connectNulls />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
-function buildTempForecast(history = [], latestTemperature = 0) {
-  const steps = [10, 20, 30, 35, 39];
-  const recent = history.slice(-5);
-  const slope = recent.length > 1
-    ? (Number(recent[recent.length - 1]?.temperature || latestTemperature) - Number(recent[0]?.temperature || latestTemperature)) / (recent.length - 1)
-    : 0.8;
+function startOfHour(dateValue) {
+  const date = new Date(dateValue);
+  date.setMinutes(0, 0, 0);
+  return date;
+}
 
-  return steps.map((minute, index) => ({
-    minute,
-    temperature: Number(latestTemperature || 0) + slope * (index + 1) * 1.25,
+function parseTimestampValue(rawValue) {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+
+  if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+    return new Date(rawValue < 1e12 ? rawValue * 1000 : rawValue);
+  }
+
+  if (typeof rawValue === 'string') {
+    const numeric = Number(rawValue);
+    if (!Number.isNaN(numeric) && rawValue.trim() !== '') {
+      return new Date(numeric < 1e12 ? numeric * 1000 : numeric);
+    }
+
+    const parsed = new Date(rawValue);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  return null;
+}
+
+function getHistoryEntryDate(item) {
+  const directTimestamp = parseTimestampValue(item?.timestamp);
+  if (directTimestamp && !Number.isNaN(directTimestamp.getTime())) return directTimestamp;
+
+  const timeValue = parseTimestampValue(item?.time);
+  if (timeValue && !Number.isNaN(timeValue.getTime())) return timeValue;
+
+  if (item?.date && item?.time) {
+    const merged = new Date(`${item.date} ${item.time}`);
+    if (!Number.isNaN(merged.getTime())) return merged;
+  }
+
+  if (item?.date) {
+    const parsedDate = new Date(item.date);
+    if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
+  }
+
+  return null;
+}
+
+function buildTimeSeriesForecast(history = [], latestTemperature = 0) {
+  const now = new Date();
+  const latestHour = startOfHour(now);
+  const recent = history.slice(-8).map((item) => Number(item.temperature || 0));
+  const baseline = Number(latestTemperature || 0);
+
+  const deltas = recent.slice(1).map((value, idx) => value - recent[idx]);
+  const avgDelta = deltas.length ? deltas.reduce((sum, value) => sum + value, 0) / deltas.length : 0;
+  const smoothTrend = Math.max(-0.8, Math.min(0.8, avgDelta));
+
+  return Array.from({ length: 7 }, (_, step) => {
+    const pointTime = new Date(latestHour);
+    pointTime.setMinutes(pointTime.getMinutes() + step * 10);
+
+    const swing = Math.sin((step / 6) * Math.PI) * 0.7;
+    const projected = baseline + smoothTrend * step + swing;
+
+    return {
+      timeLabel: pointTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+      timestamp: pointTime.toISOString(),
+      temperature: Number(projected.toFixed(2)),
+      minutesAhead: step * 10,
+    };
+  });
+}
+
+function buildHourlyAverages(history = [], monthValue, dayValue, yKey) {
+  const filtered = history.filter((item) => {
+    const date = getHistoryEntryDate(item);
+    if (!date) return false;
+
+    const itemMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const itemDay = String(date.getDate()).padStart(2, '0');
+
+    return itemMonth === monthValue && itemDay === dayValue;
+  });
+
+  const hourlyBuckets = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    count: 0,
+    sum: 0,
+  }));
+
+  filtered.forEach((item) => {
+    const date = getHistoryEntryDate(item);
+    if (!date) return;
+    const value = Number(item[yKey] || 0);
+    const hour = date.getHours();
+    hourlyBuckets[hour].count += 1;
+    hourlyBuckets[hour].sum += value;
+  });
+
+  return hourlyBuckets.map((bucket) => ({
+    hourLabel: `${String(bucket.hour).padStart(2, '0')}:00`,
+    [yKey]: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null,
   }));
 }
 
 export default function TemperatureHumidityPage() {
-  const { latest, history, analysis, loading } = useTempHumData();
+  const { latest, history, loading } = useTempHumData();
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
+  const [selectedDate, setSelectedDate] = useState(String(now.getDate()).padStart(2, '0'));
+
+  const forecastRows = useMemo(() => buildTimeSeriesForecast(history, latest?.temperature), [history, latest?.temperature]);
+
+  const humidityTrendRows = useMemo(
+    () => buildHourlyAverages(history, selectedMonth, selectedDate, 'humidity'),
+    [history, selectedMonth, selectedDate],
+  );
+
+  const temperatureTrendRows = useMemo(
+    () => buildHourlyAverages(history, selectedMonth, selectedDate, 'temperature'),
+    [history, selectedMonth, selectedDate],
+  );
 
   if (loading) return <LoadingState label="Loading temperature and humidity dashboard..." />;
   if (!latest) return <EmptyState label="No temperature and humidity data available." />;
@@ -80,7 +204,6 @@ export default function TemperatureHumidityPage() {
   const latestTemp = Number(latest.temperature || 0);
   const latestHumidity = Number(latest.humidity || 0);
   const recentRows = [...history].reverse().slice(0, 4);
-  const forecastRows = buildTempForecast(history, latestTemp);
   const crossing = forecastRows.find((row) => row.temperature >= 38);
 
   const generatedAlerts = [
@@ -92,6 +215,30 @@ export default function TemperatureHumidityPage() {
       : []),
   ].slice(0, 2);
 
+  const renderTrendFilter = () => (
+    <div className="trend-filter-inline">
+      <select
+        className="filter-select filter-select-small"
+        value={selectedMonth}
+        onChange={(event) => setSelectedMonth(event.target.value)}
+      >
+        {MONTH_OPTIONS.map((month) => (
+          <option key={month.value} value={month.value}>{month.label}</option>
+        ))}
+      </select>
+
+      <select
+        className="filter-select filter-select-small"
+        value={selectedDate}
+        onChange={(event) => setSelectedDate(event.target.value)}
+      >
+        {DAY_OPTIONS.map((date) => (
+          <option key={date.value} value={date.value}>{date.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
     <div className="page-grid">
       <div className="th-banner-row">
@@ -102,7 +249,7 @@ export default function TemperatureHumidityPage() {
         <div className="th-banner danger">
           <AlertTriangle size={16} />
           <span>
-            Next Hour Temperature: {crossing ? `reach 38°C within ${crossing.minute} minutes` : 'below 38°C trend'}
+            Next Hour Temperature: {crossing ? `reach 38°C within ${crossing.minutesAhead} minutes` : 'below 38°C trend'}
           </span>
         </div>
       </div>
@@ -119,35 +266,30 @@ export default function TemperatureHumidityPage() {
           <div className="th-forecast-wrap">
             <div className="th-forecast-chart">
               <ResponsiveContainer width="100%" height={190}>
-                <ComposedChart
-                  data={forecastRows.map((row) => ({
-                    ...row,
-                    timeLabel: `12.${String(row.minute).padStart(2, '0')}`,
-                  }))}
-                >
+                <ComposedChart data={forecastRows}>
                   <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
                   <XAxis dataKey="timeLabel" tick={{ fontSize: 10 }} />
                   <YAxis domain={[0, 45]} tick={{ fontSize: 10 }} />
-                  <Tooltip />
+                  <Tooltip labelFormatter={(label) => `Time: ${label}`} />
                   <ReferenceArea y1={0} y2={25} fill="#c7dfc0" fillOpacity={0.95} />
                   <ReferenceArea y1={25} y2={35} fill="#ddd2b3" fillOpacity={0.9} />
                   <ReferenceArea y1={35} y2={45} fill="#e4c4c4" fillOpacity={0.9} />
-                  <Line type="monotone" dataKey="temperature" stroke="#333" strokeWidth={1.3} dot={false} />
+                  <Line type="monotone" dataKey="temperature" stroke="#333" strokeWidth={1.3} dot />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
             <div className="th-forecast-list">
               {forecastRows.map((row) => (
-                <div key={row.minute} className="th-forecast-item">
-                  <span>{row.minute} min</span>
-                  <strong>{row.temperature.toFixed(0)} °C</strong>
+                <div key={row.timeLabel} className="th-forecast-item">
+                  <span>{row.timeLabel}</span>
+                  <strong>{row.temperature.toFixed(1)} °C</strong>
                 </div>
               ))}
             </div>
           </div>
           <div className="th-forecast-note">
             <AlertTriangle size={16} />
-            Temperature may reach 38°C within {crossing?.minute ?? 45} minutes if current trend continues
+            Time-series forecast for the next hour from current time ({formatChartTime(new Date())})
           </div>
         </Panel>
 
@@ -167,15 +309,15 @@ export default function TemperatureHumidityPage() {
       </div>
 
       <div className="dashboard-grid two-col">
-        <Panel title="Humidity Trend">
-          <ZonedTrendChart data={history} yKey="humidity" maxY={100} safeMax={40} warnMax={70} />
+        <Panel title="Humidity Trend" action={renderTrendFilter()}>
+          <ZonedTrendChart data={humidityTrendRows} yKey="humidity" maxY={100} safeMax={40} warnMax={70} />
         </Panel>
-        <Panel title="Temperature Trend in last 24 hours">
-          <ZonedTrendChart data={history} yKey="temperature" maxY={50} safeMax={20} warnMax={32} />
+        <Panel title="Temperature Trend in last 24 hours" action={renderTrendFilter()}>
+          <ZonedTrendChart data={temperatureTrendRows} yKey="temperature" maxY={50} safeMax={20} warnMax={32} />
         </Panel>
       </div>
 
-      <div className="dashboard-grid middle-row">
+      <div className="dashboard-grid middle-row single-col">
         <Panel title="Humidity and Temperature Sensor Live Data">
           <SensorTable
             columns={[
@@ -192,13 +334,6 @@ export default function TemperatureHumidityPage() {
               alertLevel: Number(row.temperature || 0) >= 38 ? 'HIGH' : 'NONE',
             }))}
           />
-        </Panel>
-
-        <Panel title="Filter Date">
-          <div className="filter-box">
-            <select className="filter-select"><option>Month</option></select>
-            <select className="filter-select"><option>Date</option></select>
-          </div>
         </Panel>
       </div>
 
