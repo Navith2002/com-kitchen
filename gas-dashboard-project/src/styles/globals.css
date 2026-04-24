@@ -323,3 +323,254 @@ a { color: inherit; text-decoration: none; }
     grid-template-columns: 1fr;
   }
 }
+
+.fridge-design {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fridge-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3530;
+}
+
+.fridge-system-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fridge-system-pill,
+.fridge-system-status {
+  background: #78de57;
+  border: 1px solid #649f4e;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #14301c;
+}
+
+.fridge-system-pill {
+  flex: 1;
+}
+
+.fridge-top-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.9fr 0.9fr;
+  gap: 12px;
+}
+
+.fridge-mid-grid,
+.fridge-bottom-grid {
+  display: grid;
+  grid-template-columns: 1.7fr 0.9fr;
+  gap: 12px;
+}
+
+.fridge-card {
+  background: #efefef;
+  border-radius: 14px;
+  border: 1px solid #a8b2a8;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  padding: 12px 14px;
+}
+
+.fridge-card h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.fridge-hero-status {
+  font-size: 48px;
+  color: #b4a57a;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+
+.fridge-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fridge-meta-grid span {
+  display: block;
+  font-size: 12px;
+  color: #6a6a6a;
+}
+
+.fridge-meta-grid strong {
+  font-size: 24px;
+  color: #303030;
+  line-height: 1.2;
+}
+
+.fridge-duration {
+  text-align: center;
+  font-size: 56px;
+  color: #b4a57a;
+  font-weight: 700;
+}
+
+.fridge-subtitle {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #454545;
+  margin-bottom: 12px;
+}
+
+.fridge-threshold-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.fridge-threshold {
+  border-radius: 10px;
+  padding: 9px 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fridge-threshold.normal { background: #b4e7a3; color: #1a5120; }
+.fridge-threshold.warning { background: #e5cd92; color: #6d4600; }
+.fridge-threshold.critical { background: #e6a4a4; color: #741e1e; }
+
+.fridge-count {
+  font-size: 56px;
+  font-weight: 700;
+  color: #b4a57a;
+  line-height: 1;
+}
+
+.fridge-count-compare {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  border-top: 1px solid #c8c8c8;
+  padding-top: 8px;
+}
+
+.fridge-count-compare span {
+  display: block;
+  font-size: 11px;
+  color: #666;
+}
+
+.fridge-count-compare strong {
+  font-size: 36px;
+  color: #303030;
+}
+
+.fridge-battery-ring {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 13px solid #8fdc6a;
+  margin: 6px auto 12px;
+  display: grid;
+  place-content: center;
+}
+
+.fridge-battery-ring strong {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.fridge-battery-ring span {
+  font-size: 12px;
+  text-align: center;
+}
+
+.fridge-signal-text {
+  font-size: 12px;
+  color: #4f4f4f;
+}
+
+.fridge-alert {
+  border: 1px solid #ccb57f;
+  background: #f8efd4;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  color: #6b4d11;
+}
+
+.fridge-alert-btn {
+  margin-top: 10px;
+  background: #e8bd6b;
+  border: 1px solid #b28d45;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.fridge-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.fridge-heatmap-row {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+}
+
+.fridge-heatmap-row span {
+  height: 13px;
+  border-radius: 2px;
+}
+
+.fridge-heatmap-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #5c5c5c;
+}
+
+.fridge-footer-strip {
+  border-radius: 10px;
+  background: #ececec;
+  border: 1px solid #afb8af;
+  padding: 9px 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 12px;
+}
+
+.fridge-cloud-status {
+  font-size: 12px;
+  color: #374337;
+}
+
+.fridge-cloud-status strong {
+  background: #b4d4b0;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+@media (max-width: 1300px) {
+  .fridge-top-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fridge-mid-grid,
+  .fridge-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fridge-footer-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+}
