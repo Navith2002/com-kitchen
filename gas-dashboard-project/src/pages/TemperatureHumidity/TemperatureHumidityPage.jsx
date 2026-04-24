@@ -4,6 +4,8 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  Scatter,
+  ScatterChart,
   ReferenceArea,
   ResponsiveContainer,
   Tooltip,
@@ -15,6 +17,8 @@ import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import SensorTable from '../../components/common/SensorTable';
 import useTempHumData from '../../hooks/useTempHumData';
+import useFireData from '../../hooks/useFireData';
+import useFridgeData from '../../hooks/useFridgeData';
 import { formatChartTime, formatShortTime } from '../../utils/formatters';
 
 const MONTH_OPTIONS = [
@@ -145,6 +149,96 @@ function buildHourlyAverages(history = [], monthValue, dayValue, yKey) {
     hourLabel: `${String(bucket.hour).padStart(2, '0')}:00`,
     [yKey]: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null,
   }));
+}
+
+function getNumericValue(item, keys = []) {
+  for (const key of keys) {
+    const value = Number(item?.[key]);
+    if (!Number.isNaN(value)) return value;
+  }
+  return null;
+}
+
+function statusToBinary(statusValue) {
+  const text = String(statusValue || '').toLowerCase();
+  return text.includes('open') || text === '1' || text === 'true' ? 1 : 0;
+}
+
+function filterHistoryByMonthDay(rows = [], monthValue, dayValue) {
+  return rows.filter((item) => {
+    const date = getHistoryEntryDate(item);
+    if (!date) return false;
+    return String(date.getMonth() + 1).padStart(2, '0') === monthValue
+      && String(date.getDate()).padStart(2, '0') === dayValue;
+  });
+}
+
+function buildCorrelationRows({ mode, tempHistory = [], fireHistory = [], fridgeHistory = [], monthValue, dayValue }) {
+  const filteredTemp = filterHistoryByMonthDay(tempHistory, monthValue, dayValue);
+  const filteredFire = filterHistoryByMonthDay(fireHistory, monthValue, dayValue);
+  const filteredFridge = filterHistoryByMonthDay(fridgeHistory, monthValue, dayValue);
+
+  if (mode === 'temp_fire') {
+    const pairedLength = Math.min(filteredTemp.length, filteredFire.length);
+    return Array.from({ length: pairedLength }, (_, index) => {
+      const tempItem = filteredTemp[index];
+      const fireItem = filteredFire[index];
+      const xValue = Number(tempItem?.temperature);
+      const yValue = getNumericValue(fireItem, ['flame_intensity', 'fireProbability', 'fireValue']);
+
+      if (Number.isNaN(xValue) || yValue === null) return null;
+
+      return {
+        x: Number(xValue.toFixed(2)),
+        y: Number(yValue.toFixed(2)),
+        time: formatChartTime(getHistoryEntryDate(tempItem)),
+      };
+    }).filter(Boolean);
+  }
+
+  const pairedLength = Math.min(filteredTemp.length, filteredFridge.length);
+  return Array.from({ length: pairedLength }, (_, index) => {
+    const tempItem = filteredTemp[index];
+    const fridgeItem = filteredFridge[index];
+    const xValue = Number(tempItem?.humidity);
+    const statusRaw = fridgeItem?.status ?? fridgeItem?.door_status ?? fridgeItem?.doorStatus;
+    const yValue = statusToBinary(statusRaw);
+
+    if (Number.isNaN(xValue)) return null;
+
+    return {
+      x: Number(xValue.toFixed(2)),
+      y: yValue,
+      statusLabel: yValue ? 'OPEN' : 'CLOSED',
+      time: formatChartTime(getHistoryEntryDate(tempItem)),
+    };
+  }).filter(Boolean);
+}
+
+function CorrelationScatter({ data = [], mode = 'temp_fire' }) {
+  const isFire = mode === 'temp_fire';
+  const xLabel = isFire ? 'Temperature (°C)' : 'Humidity (%)';
+  const yLabel = isFire ? 'Fire Intensity' : 'Fridge Door (0 Closed / 1 Open)';
+  const yDomain = isFire ? ['auto', 'auto'] : [-0.2, 1.2];
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <ScatterChart margin={{ top: 8, right: 10, bottom: 8, left: 0 }}>
+        <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
+        <XAxis type="number" dataKey="x" name={xLabel} tick={{ fontSize: 10 }} />
+        <YAxis type="number" dataKey="y" name={yLabel} tick={{ fontSize: 10 }} domain={yDomain} />
+        <Tooltip
+          cursor={{ strokeDasharray: '3 3' }}
+          formatter={(value, key, payload) => {
+            if (!isFire && key === 'y') return [payload?.payload?.statusLabel || value, 'Door Status'];
+            return [value, key === 'x' ? xLabel : yLabel];
+          }}
+          labelFormatter={() => ''}
+        />
+        <Scatter data={data} fill="#1f2937" />
+      </ScatterChart>
+    </ResponsiveContainer>
+  );
 }
 
 export default function TemperatureHumidityPage() {
