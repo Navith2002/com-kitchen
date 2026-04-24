@@ -59,16 +59,39 @@ function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax }) {
 }
 
 function buildTempForecast(history = [], latestTemperature = 0) {
-  const steps = [10, 20, 30, 35, 39];
-  const recent = history.slice(-5);
-  const slope = recent.length > 1
-    ? (Number(recent[recent.length - 1]?.temperature || latestTemperature) - Number(recent[0]?.temperature || latestTemperature)) / (recent.length - 1)
-    : 0.8;
+  const latestSample = history[history.length - 1];
+  const startTime = new Date(latestSample?.timestamp || Date.now());
+  const seedTemp = Number(latestTemperature || latestSample?.temperature || 0);
+  const recent = history
+    .slice(-12)
+    .map((item) => Number(item.temperature || seedTemp))
+    .filter((item) => Number.isFinite(item));
 
-  return steps.map((minute, index) => ({
-    minute,
-    temperature: Number(latestTemperature || 0) + slope * (index + 1) * 1.25,
-  }));
+  const deltas = recent.slice(1).map((value, index) => value - recent[index]);
+  const avgDelta = deltas.length
+    ? deltas.reduce((acc, item) => acc + item, 0) / deltas.length
+    : 0;
+  const avgAcceleration = deltas.length > 1
+    ? deltas.slice(1).reduce((acc, item, index) => acc + (item - deltas[index]), 0) / (deltas.length - 1)
+    : 0;
+
+  const points = [];
+  let projectedTemp = seedTemp;
+  for (let step = 1; step <= 6; step += 1) {
+    const momentum = avgDelta * Math.exp(-step / 3);
+    const curvature = avgAcceleration * Math.sin((step / 6) * Math.PI) * 0.8;
+    projectedTemp += momentum + curvature;
+
+    const pointTime = new Date(startTime.getTime() + step * 10 * 60 * 1000);
+    points.push({
+      minute: step * 10,
+      timestamp: pointTime.toISOString(),
+      timeLabel: formatChartTime(pointTime),
+      temperature: Number(projectedTemp.toFixed(2)),
+    });
+  }
+
+  return points;
 }
 
 export default function TemperatureHumidityPage() {
@@ -119,12 +142,7 @@ export default function TemperatureHumidityPage() {
           <div className="th-forecast-wrap">
             <div className="th-forecast-chart">
               <ResponsiveContainer width="100%" height={190}>
-                <ComposedChart
-                  data={forecastRows.map((row) => ({
-                    ...row,
-                    timeLabel: `12.${String(row.minute).padStart(2, '0')}`,
-                  }))}
-                >
+                <ComposedChart data={forecastRows}>
                   <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
                   <XAxis dataKey="timeLabel" tick={{ fontSize: 10 }} />
                   <YAxis domain={[0, 45]} tick={{ fontSize: 10 }} />
