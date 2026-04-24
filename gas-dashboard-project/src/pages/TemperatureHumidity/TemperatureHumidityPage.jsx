@@ -62,87 +62,36 @@ function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle 
 }
 
 function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax }) {
-  const zoneGradientId = `${yKey}-zone-gradient`;
-
   return (
     <div className="th-trend-chart-narrow">
       <ResponsiveContainer width="100%" height={180}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-          <defs>
-            <linearGradient id={zoneGradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity={0.04} />
-            </linearGradient>
-          </defs>
           <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
           <XAxis dataKey="hourLabel" tick={{ fontSize: 10 }} />
           <YAxis domain={[0, maxY]} tick={{ fontSize: 10 }} />
-          <Tooltip
-            formatter={(value) => [value == null ? '--' : value, yKey]}
-            contentStyle={{ borderRadius: 10, borderColor: '#9da2a4', background: '#f8f9fa' }}
-          />
+          <Tooltip />
           <ReferenceArea y1={0} y2={safeMax} fill="#c7dfc0" fillOpacity={0.95} />
           <ReferenceArea y1={safeMax} y2={warnMax} fill="#ddd2b3" fillOpacity={0.9} />
           <ReferenceArea y1={warnMax} y2={maxY} fill="#e4c4c4" fillOpacity={0.9} />
-          <ReferenceArea y1={0} y2={maxY} fill={`url(#${zoneGradientId})`} fillOpacity={1} />
-          <Line
-            type="monotone"
-            dataKey={yKey}
-            stroke="#333"
-            strokeWidth={1.3}
-            dot
-            connectNulls
-          />
+          <Line type="monotone" dataKey={yKey} stroke="#333" strokeWidth={1.2} dot={false} connectNulls />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
+function getMonthLabel(date) {
+  return date.toLocaleString([], { month: 'short', year: 'numeric' });
+}
+
+function getDateLabel(date) {
+  return date.toLocaleDateString([], { day: '2-digit', month: 'short' });
+}
+
 function startOfHour(dateValue) {
   const date = new Date(dateValue);
   date.setMinutes(0, 0, 0);
   return date;
-}
-
-function parseTimestampValue(rawValue) {
-  if (rawValue === null || rawValue === undefined || rawValue === '') return null;
-
-  if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
-    return new Date(rawValue < 1e12 ? rawValue * 1000 : rawValue);
-  }
-
-  if (typeof rawValue === 'string') {
-    const numeric = Number(rawValue);
-    if (!Number.isNaN(numeric) && rawValue.trim() !== '') {
-      return new Date(numeric < 1e12 ? numeric * 1000 : numeric);
-    }
-
-    const parsed = new Date(rawValue);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-
-  return null;
-}
-
-function getHistoryEntryDate(item) {
-  const directTimestamp = parseTimestampValue(item?.timestamp);
-  if (directTimestamp && !Number.isNaN(directTimestamp.getTime())) return directTimestamp;
-
-  const timeValue = parseTimestampValue(item?.time);
-  if (timeValue && !Number.isNaN(timeValue.getTime())) return timeValue;
-
-  if (item?.date && item?.time) {
-    const merged = new Date(`${item.date} ${item.time}`);
-    if (!Number.isNaN(merged.getTime())) return merged;
-  }
-
-  if (item?.date) {
-    const parsedDate = new Date(item.date);
-    if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
-  }
-
-  return null;
 }
 
 function buildTimeSeriesForecast(history = [], latestTemperature = 0) {
@@ -173,13 +122,13 @@ function buildTimeSeriesForecast(history = [], latestTemperature = 0) {
 
 function buildHourlyAverages(history = [], monthValue, dayValue, yKey) {
   const filtered = history.filter((item) => {
-    const date = getHistoryEntryDate(item);
-    if (!date) return false;
+    const date = new Date(item.timestamp);
+    if (Number.isNaN(date.getTime())) return false;
 
-    const itemMonth = String(date.getMonth() + 1).padStart(2, '0');
-    const itemDay = String(date.getDate()).padStart(2, '0');
+    const itemMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const itemDate = `${itemMonth}-${String(date.getDate()).padStart(2, '0')}`;
 
-    return itemMonth === monthValue && itemDay === dayValue;
+    return itemMonth === monthValue && itemDate === dayValue;
   });
 
   const hourlyBuckets = Array.from({ length: 24 }, (_, hour) => ({
@@ -189,8 +138,7 @@ function buildHourlyAverages(history = [], monthValue, dayValue, yKey) {
   }));
 
   filtered.forEach((item) => {
-    const date = getHistoryEntryDate(item);
-    if (!date) return;
+    const date = new Date(item.timestamp);
     const value = Number(item[yKey] || 0);
     const hour = date.getHours();
     hourlyBuckets[hour].count += 1;
@@ -295,34 +243,62 @@ function CorrelationScatter({ data = [], mode = 'temp_fire' }) {
 
 export default function TemperatureHumidityPage() {
   const { latest, history, loading } = useTempHumData();
-  const { history: fireHistory, loading: fireLoading } = useFireData();
-  const { history: fridgeHistory, loading: fridgeLoading } = useFridgeData();
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
-  const [selectedDate, setSelectedDate] = useState(String(now.getDate()).padStart(2, '0'));
-  const [correlationMode, setCorrelationMode] = useState('temp_fire');
+
+  const monthOptions = useMemo(() => {
+    const monthMap = new Map();
+
+    history.forEach((item) => {
+      const date = new Date(item.timestamp);
+      if (Number.isNaN(date.getTime())) return;
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthMap.has(value)) monthMap.set(value, getMonthLabel(date));
+    });
+
+    return Array.from(monthMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => b.value.localeCompare(a.value));
+  }, [history]);
+
+  const initialMonth = monthOptions[0]?.value || '';
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+
+  const dayOptions = useMemo(() => {
+    if (!selectedMonth) return [];
+
+    const dayMap = new Map();
+
+    history.forEach((item) => {
+      const date = new Date(item.timestamp);
+      if (Number.isNaN(date.getTime())) return;
+
+      const monthValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (monthValue !== selectedMonth) return;
+
+      const dayValue = `${monthValue}-${String(date.getDate()).padStart(2, '0')}`;
+      if (!dayMap.has(dayValue)) dayMap.set(dayValue, getDateLabel(date));
+    });
+
+    return Array.from(dayMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => b.value.localeCompare(a.value));
+  }, [history, selectedMonth]);
+
+  const initialDate = dayOptions[0]?.value || '';
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+
+  const activeMonth = selectedMonth || initialMonth;
+  const activeDate = selectedDate || initialDate;
 
   const forecastRows = useMemo(() => buildTimeSeriesForecast(history, latest?.temperature), [history, latest?.temperature]);
 
   const humidityTrendRows = useMemo(
-    () => buildHourlyAverages(history, selectedMonth, selectedDate, 'humidity'),
-    [history, selectedMonth, selectedDate],
+    () => buildHourlyAverages(history, activeMonth, activeDate, 'humidity'),
+    [history, activeMonth, activeDate],
   );
 
   const temperatureTrendRows = useMemo(
-    () => buildHourlyAverages(history, selectedMonth, selectedDate, 'temperature'),
-    [history, selectedMonth, selectedDate],
-  );
-  const correlationRows = useMemo(
-    () => buildCorrelationRows({
-      mode: correlationMode,
-      tempHistory: history,
-      fireHistory,
-      fridgeHistory,
-      monthValue: selectedMonth,
-      dayValue: selectedDate,
-    }),
-    [correlationMode, history, fireHistory, fridgeHistory, selectedMonth, selectedDate],
+    () => buildHourlyAverages(history, activeMonth, activeDate, 'temperature'),
+    [history, activeMonth, activeDate],
   );
 
   if (loading) return <LoadingState label="Loading temperature and humidity dashboard..." />;
@@ -346,22 +322,25 @@ export default function TemperatureHumidityPage() {
     <div className="trend-filter-inline">
       <select
         className="filter-select filter-select-small"
-        value={selectedMonth}
-        onChange={(event) => setSelectedMonth(event.target.value)}
+        value={activeMonth}
+        onChange={(event) => {
+          setSelectedMonth(event.target.value);
+          setSelectedDate('');
+        }}
       >
-        {MONTH_OPTIONS.map((month) => (
+        {monthOptions.length ? monthOptions.map((month) => (
           <option key={month.value} value={month.value}>{month.label}</option>
-        ))}
+        )) : <option value="">No months</option>}
       </select>
 
       <select
         className="filter-select filter-select-small"
-        value={selectedDate}
+        value={activeDate}
         onChange={(event) => setSelectedDate(event.target.value)}
       >
-        {DAY_OPTIONS.map((date) => (
+        {dayOptions.length ? dayOptions.map((date) => (
           <option key={date.value} value={date.value}>{date.label}</option>
-        ))}
+        )) : <option value="">No dates</option>}
       </select>
     </div>
   );
@@ -435,41 +414,12 @@ export default function TemperatureHumidityPage() {
         </Panel>
       </div>
 
-      <div className="dashboard-grid th-three-col">
+      <div className="dashboard-grid two-col">
         <Panel title="Humidity Trend" action={renderTrendFilter()}>
-          <ZonedTrendChart
-            data={humidityTrendRows}
-            yKey="humidity"
-            maxY={100}
-            safeMax={40}
-            warnMax={70}
-          />
+          <ZonedTrendChart data={humidityTrendRows} yKey="humidity" maxY={100} safeMax={40} warnMax={70} />
         </Panel>
         <Panel title="Temperature Trend in last 24 hours" action={renderTrendFilter()}>
-          <ZonedTrendChart
-            data={temperatureTrendRows}
-            yKey="temperature"
-            maxY={50}
-            safeMax={20}
-            warnMax={32}
-          />
-        </Panel>
-        <Panel
-          title="Correlation Map"
-          action={(
-            <select
-              className="filter-select filter-select-small"
-              value={correlationMode}
-              onChange={(event) => setCorrelationMode(event.target.value)}
-            >
-              <option value="temp_fire">Temp ↔ Fire</option>
-              <option value="hum_fridge">Humidity ↔ Fridge Door</option>
-            </select>
-          )}
-        >
-          {!fireLoading && !fridgeLoading && correlationRows.length
-            ? <CorrelationScatter data={correlationRows} mode={correlationMode} />
-            : <div className="alerts-empty">No correlation data for selected date.</div>}
+          <ZonedTrendChart data={temperatureTrendRows} yKey="temperature" maxY={50} safeMax={20} warnMax={32} />
         </Panel>
       </div>
 
