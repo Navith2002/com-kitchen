@@ -157,23 +157,6 @@ export default function TemperatureHumidityPage() {
   const { latest, history, analysis, loading } = useTempHumData();
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedDate, setSelectedDate] = useState('all');
-  const historyData = Array.isArray(history) ? history : [];
-
-  const availableMonths = useMemo(
-    () => [...new Set(historyData.map((item) => parseTimestamp(item.timestamp)?.getMonth() + 1).filter(Boolean))].sort((a, b) => a - b),
-    [historyData],
-  );
-  const availableDates = useMemo(
-    () => [...new Set(historyData
-      .map((item) => parseTimestamp(item.timestamp))
-      .filter((date) => date && (selectedMonth === 'all' || date.getMonth() + 1 === Number(selectedMonth)))
-      .map((date) => date.getDate()))].sort((a, b) => a - b),
-    [historyData, selectedMonth],
-  );
-  const hourlyAverages = useMemo(
-    () => buildHourlyAverages(historyData, selectedMonth, selectedDate),
-    [historyData, selectedMonth, selectedDate],
-  );
 
   if (loading) return <LoadingState label="Loading temperature and humidity dashboard..." />;
   if (!latest) return <EmptyState label="No temperature and humidity data available." />;
@@ -183,6 +166,21 @@ export default function TemperatureHumidityPage() {
   const recentRows = [...historyData].reverse().slice(0, 4);
   const forecastRows = buildTempForecast(historyData, latestTemp);
   const crossing = forecastRows.find((row) => row.temperature >= 38);
+  const availableMonths = useMemo(
+    () => [...new Set(history.map((item) => parseTimestamp(item.timestamp)?.getMonth() + 1).filter(Boolean))].sort((a, b) => a - b),
+    [history],
+  );
+  const availableDates = useMemo(
+    () => [...new Set(history
+      .map((item) => parseTimestamp(item.timestamp))
+      .filter((date) => date && (selectedMonth === 'all' || date.getMonth() + 1 === Number(selectedMonth)))
+      .map((date) => date.getDate()))].sort((a, b) => a - b),
+    [history, selectedMonth],
+  );
+  const hourlyAverages = useMemo(
+    () => buildHourlyAverages(history, selectedMonth, selectedDate),
+    [history, selectedMonth, selectedDate],
+  );
 
   const generatedAlerts = [
     ...(latestTemp >= 36
