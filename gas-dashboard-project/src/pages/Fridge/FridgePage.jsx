@@ -16,12 +16,18 @@ export default function FridgePage() {
   const recommendations = [];
   if (analysis?.anomaly_detected) recommendations.push('Inspect unusual fridge door activity.');
   if ((analysis?.door_open_duration_sec || 0) > 60) recommendations.push('Door has been open too long. Check cooling efficiency.');
+  const latestDuration =
+    latest?.Duration ??
+    latest?.duration ??
+    analysis?.Duration ??
+    analysis?.door_open_duration ??
+    `${analysis?.door_open_duration_sec ?? 0} sec`;
 
   return (
     <div className="page-grid">
       <div className="stats-grid">
         <StatCard title="Door Status" value={latest.status || '--'} status={latest.status === 'OPEN' ? 'WARNING' : 'SAFE'} />
-        <StatCard title="Open Duration" value={`${analysis?.door_open_duration_sec ?? 0} sec`} />
+        <StatCard title="Door Open Duration" value={latestDuration} />
         <StatCard title="Predicted Behavior" value={analysis?.predicted_behavior || 'NORMAL'} />
         <StatCard title="Anomaly" value={analysis?.anomaly_detected ? 'YES' : 'NO'} />
       </div>
