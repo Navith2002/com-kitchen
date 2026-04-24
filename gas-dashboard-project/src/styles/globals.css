@@ -73,6 +73,7 @@ a { color: inherit; text-decoration: none; }
 }
 .top-row { grid-template-columns: 1.15fr 2.2fr 1fr; }
 .middle-row { grid-template-columns: 2.4fr 0.9fr; }
+.middle-row.single-col { grid-template-columns: 1fr; }
 .bottom-row, .two-col { grid-template-columns: 1fr 1fr; }
 .stats-grid {
   display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -178,6 +179,19 @@ a { color: inherit; text-decoration: none; }
 .filter-box { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
 .filter-select {
   width: 100%; border: 1px solid #979797; background: white; border-radius: 14px; padding: 8px 12px;
+}
+.trend-filter-inline {
+  display: flex;
+  gap: 6px;
+}
+.filter-select-small {
+  min-width: 92px;
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.th-trend-chart-narrow {
+  max-width: 520px;
 }
 .summary-list { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .recommendation-panel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
