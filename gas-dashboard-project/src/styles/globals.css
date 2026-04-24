@@ -183,15 +183,17 @@ a { color: inherit; text-decoration: none; }
 .trend-filter-inline {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 .filter-select-small {
-  min-width: 92px;
+  min-width: 98px;
   border-radius: 10px;
   padding: 4px 8px;
   font-size: 11px;
 }
 .th-trend-chart-narrow {
-  max-width: 520px;
+  max-width: 420px;
+  margin: 0 auto;
 }
 .summary-list { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .recommendation-panel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
