@@ -57,7 +57,7 @@ function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle 
   );
 }
 
-function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax, lineColor = '#333', dotColor = '#333' }) {
+function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax }) {
   const zoneGradientId = `${yKey}-zone-gradient`;
 
   return (
@@ -84,10 +84,9 @@ function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax, lineColor = 
           <Line
             type="monotone"
             dataKey={yKey}
-            stroke={lineColor}
-            strokeWidth={2}
-            dot={{ r: 4, strokeWidth: 1.6, stroke: '#2f3437', fill: '#ffffff' }}
-            activeDot={{ r: 4.6, strokeWidth: 1.8, stroke: '#2f3437', fill: '#ffffff' }}
+            stroke="#333"
+            strokeWidth={1.3}
+            dot
             connectNulls
           />
         </ComposedChart>
@@ -336,8 +335,6 @@ export default function TemperatureHumidityPage() {
             maxY={100}
             safeMax={40}
             warnMax={70}
-            lineColor="#155e75"
-            dotColor="#0e7490"
           />
         </Panel>
         <Panel title="Temperature Trend in last 24 hours" action={renderTrendFilter()}>
@@ -347,8 +344,6 @@ export default function TemperatureHumidityPage() {
             maxY={50}
             safeMax={20}
             warnMax={32}
-            lineColor="#7c2d12"
-            dotColor="#c2410c"
           />
         </Panel>
       </div>
