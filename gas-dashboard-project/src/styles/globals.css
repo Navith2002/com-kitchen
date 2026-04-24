@@ -194,25 +194,7 @@ a { color: inherit; text-decoration: none; }
 .th-trend-chart-narrow {
   max-width: 420px;
   margin: 0 auto;
-  padding: 8px 10px 4px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.18) 100%);
-  border: 1px solid rgba(94, 107, 104, 0.35);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 2px 7px rgba(60, 70, 66, 0.15);
 }
-.th-three-col {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-.th-heatmap { display: flex; flex-direction: column; gap: 4px; }
-.th-heatmap-row { display: grid; grid-template-columns: 82px repeat(8, 1fr); gap: 3px; align-items: center; }
-.th-heatmap-day-cell { font-size: 11px; color: #303030; }
-.th-heatmap-time-cell { font-size: 10px; color: #5a5a5a; text-align: center; }
-.th-heatmap-cell { height: 18px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.08); }
-.th-heatmap-cell.none { background: #ececec; }
-.th-heatmap-cell.cool { background: #9da6d8; }
-.th-heatmap-cell.mild { background: #68b06d; }
-.th-heatmap-cell.warm { background: #b2b13f; }
-.th-heatmap-cell.hot { background: #c86868; }
 .summary-list { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .recommendation-panel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
 .footer-strip {
