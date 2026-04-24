@@ -57,19 +57,39 @@ function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle 
   );
 }
 
-function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax }) {
+function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax, lineColor = '#333', dotColor = '#333' }) {
+  const zoneGradientId = `${yKey}-zone-gradient`;
+
   return (
     <div className="th-trend-chart-narrow">
       <ResponsiveContainer width="100%" height={180}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+          <defs>
+            <linearGradient id={zoneGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity={0.04} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
           <XAxis dataKey="hourLabel" tick={{ fontSize: 10 }} />
           <YAxis domain={[0, maxY]} tick={{ fontSize: 10 }} />
-          <Tooltip />
+          <Tooltip
+            formatter={(value) => [value == null ? '--' : value, yKey]}
+            contentStyle={{ borderRadius: 10, borderColor: '#9da2a4', background: '#f8f9fa' }}
+          />
           <ReferenceArea y1={0} y2={safeMax} fill="#c7dfc0" fillOpacity={0.95} />
           <ReferenceArea y1={safeMax} y2={warnMax} fill="#ddd2b3" fillOpacity={0.9} />
           <ReferenceArea y1={warnMax} y2={maxY} fill="#e4c4c4" fillOpacity={0.9} />
-          <Line type="monotone" dataKey={yKey} stroke="#333" strokeWidth={1.2} dot={false} connectNulls />
+          <ReferenceArea y1={0} y2={maxY} fill={`url(#${zoneGradientId})`} fillOpacity={1} />
+          <Line
+            type="monotone"
+            dataKey={yKey}
+            stroke={lineColor}
+            strokeWidth={2}
+            dot={{ r: 3.2, strokeWidth: 1.2, stroke: '#fff', fill: dotColor }}
+            activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: dotColor }}
+            connectNulls
+          />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -310,10 +330,26 @@ export default function TemperatureHumidityPage() {
 
       <div className="dashboard-grid two-col">
         <Panel title="Humidity Trend" action={renderTrendFilter()}>
-          <ZonedTrendChart data={humidityTrendRows} yKey="humidity" maxY={100} safeMax={40} warnMax={70} />
+          <ZonedTrendChart
+            data={humidityTrendRows}
+            yKey="humidity"
+            maxY={100}
+            safeMax={40}
+            warnMax={70}
+            lineColor="#155e75"
+            dotColor="#0e7490"
+          />
         </Panel>
         <Panel title="Temperature Trend in last 24 hours" action={renderTrendFilter()}>
-          <ZonedTrendChart data={temperatureTrendRows} yKey="temperature" maxY={50} safeMax={20} warnMax={32} />
+          <ZonedTrendChart
+            data={temperatureTrendRows}
+            yKey="temperature"
+            maxY={50}
+            safeMax={20}
+            warnMax={32}
+            lineColor="#7c2d12"
+            dotColor="#c2410c"
+          />
         </Panel>
       </div>
 
