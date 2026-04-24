@@ -183,15 +183,25 @@ a { color: inherit; text-decoration: none; }
 .trend-filter-inline {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 .filter-select-small {
-  min-width: 92px;
+  min-width: 98px;
   border-radius: 10px;
   padding: 4px 8px;
   font-size: 11px;
 }
 .th-trend-chart-narrow {
-  max-width: 520px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 8px 10px 4px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.18) 100%);
+  border: 1px solid rgba(94, 107, 104, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 2px 7px rgba(60, 70, 66, 0.15);
+}
+.th-three-col {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 .summary-list { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .recommendation-panel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -200,7 +210,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 1100px) {
-  .top-row, .middle-row, .bottom-row, .two-col, .stats-grid { grid-template-columns: 1fr; }
+  .top-row, .middle-row, .bottom-row, .two-col, .th-three-col, .stats-grid { grid-template-columns: 1fr; }
   .footer-strip { grid-template-columns: 1fr; }
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { flex-direction: row; justify-content: flex-start; overflow-x: auto; }
