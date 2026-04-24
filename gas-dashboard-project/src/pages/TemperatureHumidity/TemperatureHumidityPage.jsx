@@ -17,6 +17,26 @@ import SensorTable from '../../components/common/SensorTable';
 import useTempHumData from '../../hooks/useTempHumData';
 import { formatChartTime, formatShortTime } from '../../utils/formatters';
 
+const MONTH_OPTIONS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => {
+  const day = String(index + 1).padStart(2, '0');
+  return { value: day, label: String(index + 1) };
+});
+
 function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle = '' }) {
   const clamped = Math.max(min, Math.min(max, Number(value) || 0));
   const angle = -90 + ((clamped - min) / (max - min || 1)) * 180;
