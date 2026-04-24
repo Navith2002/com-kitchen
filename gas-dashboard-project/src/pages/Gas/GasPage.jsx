@@ -32,7 +32,7 @@ export default function GasPage() {
           <GaugeCard value={latest.gasValue || 0} />
         </Panel>
 
-        <Panel title="Gas Level">
+        <Panel title="Gas Sensor Data in last 24 hours">
           <TrendChart data={history} xKey="timestamp" yKey="gasValue" />
         </Panel>
 
