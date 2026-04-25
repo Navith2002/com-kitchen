@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import {
   CartesianGrid,
@@ -14,14 +14,34 @@ import Panel from '../../components/common/Panel';
 import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import GaugeCard from '../../components/charts/GaugeCard';
+import TrendChart from '../../components/charts/TrendChart';
 import AlertsPanel from '../../components/alerts/AlertsPanel';
 import SensorTable from '../../components/common/SensorTable';
 import CorrelationChart from '../../components/charts/CorrelationChart';
-import ForecastChart from '../../components/charts/ForecastChart';
 import useGasData from '../../hooks/useGasData';
 import useTempHumData from '../../hooks/useTempHumData';
 import { mergeGasTemperatureHistory } from '../../utils/correlation';
 import { formatChartTime } from '../../utils/formatters';
+
+const MONTH_OPTIONS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => {
+  const day = String(index + 1).padStart(2, '0');
+  return { value: day, label: String(index + 1) };
+});
 
 function buildGasTimeSeriesForecast(history = [], latestGasValue = 0) {
   const now = new Date();
@@ -48,16 +68,73 @@ function buildGasTimeSeriesForecast(history = [], latestGasValue = 0) {
   });
 }
 
+function getHistoryEntryDate(item) {
+  const timestamp = new Date(item?.timestamp);
+  if (!Number.isNaN(timestamp.getTime())) return timestamp;
+
+  const timeValue = new Date(item?.time);
+  if (!Number.isNaN(timeValue.getTime())) return timeValue;
+
+  if (item?.date && item?.time) {
+    const merged = new Date(`${item.date} ${item.time}`);
+    if (!Number.isNaN(merged.getTime())) return merged;
+  }
+
+  if (item?.date) {
+    const parsedDate = new Date(item.date);
+    if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
+  }
+
+  return null;
+}
+
 export default function GasPage() {
   const { latest, history, analysis, alerts, loading } = useGasData();
   const tempHum = useTempHumData();
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
+  const [selectedDate, setSelectedDate] = useState(String(now.getDate()).padStart(2, '0'));
+
   const forecastRows = useMemo(() => buildGasTimeSeriesForecast(history, latest?.gasValue), [history, latest?.gasValue]);
+  const filteredTrendRows = useMemo(() => history.filter((item) => {
+    const itemDate = getHistoryEntryDate(item);
+    if (!itemDate) return false;
+
+    const itemMonth = String(itemDate.getMonth() + 1).padStart(2, '0');
+    const itemDay = String(itemDate.getDate()).padStart(2, '0');
+
+    return itemMonth === selectedMonth && itemDay === selectedDate;
+  }), [history, selectedMonth, selectedDate]);
 
   if (loading) return <LoadingState label="Loading gas dashboard..." />;
   if (!latest) return <EmptyState label="No gas data available." />;
 
   const mergedCorrelation = mergeGasTemperatureHistory(history, tempHum.history);
   const systemSafe = (analysis?.final_risk || analysis?.predicted_risk || latest.status) !== 'DANGER';
+
+  const renderTrendFilter = () => (
+    <div className="trend-filter-inline">
+      <select
+        className="filter-select filter-select-small"
+        value={selectedMonth}
+        onChange={(event) => setSelectedMonth(event.target.value)}
+      >
+        {MONTH_OPTIONS.map((month) => (
+          <option key={month.value} value={month.value}>{month.label}</option>
+        ))}
+      </select>
+
+      <select
+        className="filter-select filter-select-small"
+        value={selectedDate}
+        onChange={(event) => setSelectedDate(event.target.value)}
+      >
+        {DAY_OPTIONS.map((date) => (
+          <option key={date.value} value={date.value}>{date.label}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div className="page-grid">
@@ -70,7 +147,7 @@ export default function GasPage() {
           <GaugeCard value={latest.gasValue || 0} />
         </Panel>
 
-        <Panel title="Gas Detection in last 24 hours">
+        <Panel title="Gas Level in Next hour">
           <div className="th-forecast-wrap">
             <div className="th-forecast-chart">
               <ResponsiveContainer width="100%" height={190}>
@@ -121,13 +198,6 @@ export default function GasPage() {
             }))}
           />
         </Panel>
-
-        <Panel title="Filter Date">
-          <div className="filter-box">
-            <select className="filter-select"><option>Month</option></select>
-            <select className="filter-select"><option>Date</option></select>
-          </div>
-        </Panel>
       </div>
 
       <div className="dashboard-grid bottom-row">
@@ -135,8 +205,8 @@ export default function GasPage() {
           <CorrelationChart data={mergedCorrelation} />
         </Panel>
 
-        <Panel title="Gas Level in Next 03 hours">
-          <ForecastChart data={history} sourceKey="gasValue" />
+        <Panel title="Gas Detection in last 24 hours" action={renderTrendFilter()}>
+          <TrendChart data={filteredTrendRows} xKey="timestamp" yKey="gasValue" />
         </Panel>
       </div>
 
