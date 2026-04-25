@@ -19,7 +19,13 @@ function buildTicks(totalPoints, tickCount = 6) {
   return Array.from({ length: tickCount }, (_, idx) => Math.round(idx * step));
 }
 
-export default function TrendChart({ data, xKey, yKey, maxY = 16 }) {
+function buildYAxisTicks(maxY, segments = 4) {
+  if (!Number.isFinite(maxY) || maxY <= 0) return [0, 1, 2, 3, 4];
+  const step = maxY / segments;
+  return Array.from({ length: segments + 1 }, (_, idx) => Math.round(step * idx));
+}
+
+export default function TrendChart({ data, xKey, yKey, maxY }) {
   const chartData = data.map((item, index) => ({
     ...item,
     index,
@@ -32,6 +38,10 @@ export default function TrendChart({ data, xKey, yKey, maxY = 16 }) {
   const zoneEdgeTwo = Math.max(zoneEdgeOne, Math.floor(((chartData.length - 1) * 2) / 3));
   const lastIndex = chartData.length - 1;
   const xTicks = buildTicks(chartData.length);
+  const highestValue = Math.max(...chartData.map((item) => Number(item[yKey] || 0)));
+  const autoMaxY = Math.max(20, Math.ceil(highestValue * 1.15));
+  const yAxisMax = Number.isFinite(maxY) ? Math.max(maxY, autoMaxY) : autoMaxY;
+  const yTicks = buildYAxisTicks(yAxisMax);
 
   return (
     <div className="chart-box gas-zone-chart">
@@ -54,8 +64,8 @@ export default function TrendChart({ data, xKey, yKey, maxY = 16 }) {
           />
 
           <YAxis
-            domain={[0, maxY]}
-            ticks={[0, 5, 10, 15]}
+            domain={[0, yAxisMax]}
+            ticks={yTicks}
             tick={{ fontSize: 11, fill: '#8b8b8b' }}
             tickLine={false}
             axisLine={false}
