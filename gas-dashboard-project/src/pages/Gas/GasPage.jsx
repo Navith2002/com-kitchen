@@ -67,63 +67,6 @@ function buildGasTimeSeriesForecast(history = [], latestGasValue = 0) {
   });
 }
 
-
-function buildHourlyGasAverages(history = [], monthValue, dayValue) {
-  const filtered = history.filter((item) => {
-    const date = getHistoryEntryDate(item);
-    if (!date) return false;
-
-    const itemMonth = String(date.getMonth() + 1).padStart(2, '0');
-    const itemDay = String(date.getDate()).padStart(2, '0');
-
-    return itemMonth === monthValue && itemDay === dayValue;
-  });
-
-  const hourlyBuckets = Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    count: 0,
-    sum: 0,
-  }));
-
-  filtered.forEach((item) => {
-    const date = getHistoryEntryDate(item);
-    if (!date) return;
-
-    const value = Number(item?.gasValue || 0);
-    if (Number.isNaN(value)) return;
-
-    const hour = date.getHours();
-    hourlyBuckets[hour].count += 1;
-    hourlyBuckets[hour].sum += value;
-  });
-
-  return hourlyBuckets.map((bucket) => ({
-    hourLabel: `${String(bucket.hour).padStart(2, '0')}:00`,
-    gasValue: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null,
-  }));
-}
-
-function ZonedGasTrendChart({ data = [] }) {
-  return (
-    <div className="th-trend-chart-narrow">
-      <ResponsiveContainer width="100%" height={180}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-          <CartesianGrid stroke="#d8d8d8" strokeDasharray="3 3" />
-          <XAxis dataKey="hourLabel" tick={{ fontSize: 10 }} interval={2} />
-          <YAxis domain={[0, 800]} tick={{ fontSize: 10 }} />
-          <Tooltip
-            formatter={(value) => [value == null ? '--' : value, 'gasValue']}
-            contentStyle={{ borderRadius: 10, borderColor: '#9da2a4', background: '#f8f9fa' }}
-          />
-          <ReferenceArea y1={0} y2={200} fill="#c7dfc0" fillOpacity={0.95} />
-          <ReferenceArea y1={200} y2={400} fill="#ddd2b3" fillOpacity={0.9} />
-          <ReferenceArea y1={400} y2={800} fill="#e4c4c4" fillOpacity={0.9} />
-          <Line type="monotone" dataKey="gasValue" stroke="#333" strokeWidth={1.3} dot connectNulls />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
 function getHistoryEntryDate(item) {
   const timestamp = new Date(item?.timestamp);
   if (!Number.isNaN(timestamp.getTime())) return timestamp;
@@ -152,10 +95,15 @@ export default function GasPage() {
   const [selectedDate, setSelectedDate] = useState(String(now.getDate()).padStart(2, '0'));
 
   const forecastRows = useMemo(() => buildGasTimeSeriesForecast(history, latest?.gasValue), [history, latest?.gasValue]);
-  const filteredTrendRows = useMemo(
-    () => buildHourlyGasAverages(history, selectedMonth, selectedDate),
-    [history, selectedMonth, selectedDate],
-  );
+  const filteredTrendRows = useMemo(() => history.filter((item) => {
+    const itemDate = getHistoryEntryDate(item);
+    if (!itemDate) return false;
+
+    const itemMonth = String(itemDate.getMonth() + 1).padStart(2, '0');
+    const itemDay = String(itemDate.getDate()).padStart(2, '0');
+
+    return itemMonth === selectedMonth && itemDay === selectedDate;
+  }), [history, selectedMonth, selectedDate]);
 
   if (loading) return <LoadingState label="Loading gas dashboard..." />;
   if (!latest) return <EmptyState label="No gas data available." />;
@@ -257,7 +205,7 @@ export default function GasPage() {
         </Panel>
 
         <Panel title="Gas Detection in last 24 hours" action={renderTrendFilter()}>
-          <ZonedGasTrendChart data={filteredTrendRows} />
+          <TrendChart data={filteredTrendRows} xKey="timestamp" yKey="gasValue" />
         </Panel>
       </div>
 
