@@ -4,8 +4,6 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
-  Scatter,
-  ScatterChart,
   ReferenceArea,
   ResponsiveContainer,
   Tooltip,
@@ -17,8 +15,6 @@ import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import SensorTable from '../../components/common/SensorTable';
 import useTempHumData from '../../hooks/useTempHumData';
-import useFireData from '../../hooks/useFireData';
-import useFridgeData from '../../hooks/useFridgeData';
 import { formatChartTime, formatShortTime } from '../../utils/formatters';
 
 const MONTH_OPTIONS = [
@@ -63,90 +59,6 @@ function MiniGauge({ label, value = 0, min = 0, max = 100, unit = '%', subtitle 
 
 function ZonedTrendChart({ data = [], yKey, maxY, safeMax, warnMax }) {
   const zoneGradientId = `${yKey}-zone-gradient`;
-
-  filtered.forEach((item) => {
-    const date = new Date(item.timestamp);
-    const value = Number(item[yKey] || 0);
-    const hour = date.getHours();
-    hourlyBuckets[hour].count += 1;
-    hourlyBuckets[hour].sum += value;
-  });
-
-  return hourlyBuckets.map((bucket) => ({
-    hourLabel: `${String(bucket.hour).padStart(2, '0')}:00`,
-    [yKey]: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null,
-  }));
-}
-
-function getNumericValue(item, keys = []) {
-  for (const key of keys) {
-    const value = Number(item?.[key]);
-    if (!Number.isNaN(value)) return value;
-  }
-  return null;
-}
-
-function statusToBinary(statusValue) {
-  const text = String(statusValue || '').toLowerCase();
-  return text.includes('open') || text === '1' || text === 'true' ? 1 : 0;
-}
-
-function filterHistoryByMonthDay(rows = [], monthValue, dayValue) {
-  return rows.filter((item) => {
-    const date = getHistoryEntryDate(item);
-    if (!date) return false;
-    return String(date.getMonth() + 1).padStart(2, '0') === monthValue
-      && String(date.getDate()).padStart(2, '0') === dayValue;
-  });
-}
-
-function buildCorrelationRows({ mode, tempHistory = [], fireHistory = [], fridgeHistory = [], monthValue, dayValue }) {
-  const filteredTemp = filterHistoryByMonthDay(tempHistory, monthValue, dayValue);
-  const filteredFire = filterHistoryByMonthDay(fireHistory, monthValue, dayValue);
-  const filteredFridge = filterHistoryByMonthDay(fridgeHistory, monthValue, dayValue);
-
-  if (mode === 'temp_fire') {
-    const pairedLength = Math.min(filteredTemp.length, filteredFire.length);
-    return Array.from({ length: pairedLength }, (_, index) => {
-      const tempItem = filteredTemp[index];
-      const fireItem = filteredFire[index];
-      const xValue = Number(tempItem?.temperature);
-      const yValue = getNumericValue(fireItem, ['flame_intensity', 'fireProbability', 'fireValue']);
-
-      if (Number.isNaN(xValue) || yValue === null) return null;
-
-      return {
-        x: Number(xValue.toFixed(2)),
-        y: Number(yValue.toFixed(2)),
-        time: formatChartTime(getHistoryEntryDate(tempItem)),
-      };
-    }).filter(Boolean);
-  }
-
-  const pairedLength = Math.min(filteredTemp.length, filteredFridge.length);
-  return Array.from({ length: pairedLength }, (_, index) => {
-    const tempItem = filteredTemp[index];
-    const fridgeItem = filteredFridge[index];
-    const xValue = Number(tempItem?.humidity);
-    const statusRaw = fridgeItem?.status ?? fridgeItem?.door_status ?? fridgeItem?.doorStatus;
-    const yValue = statusToBinary(statusRaw);
-
-    if (Number.isNaN(xValue)) return null;
-
-    return {
-      x: Number(xValue.toFixed(2)),
-      y: yValue,
-      statusLabel: yValue ? 'OPEN' : 'CLOSED',
-      time: formatChartTime(getHistoryEntryDate(tempItem)),
-    };
-  }).filter(Boolean);
-}
-
-function CorrelationScatter({ data = [], mode = 'temp_fire' }) {
-  const isFire = mode === 'temp_fire';
-  const xLabel = isFire ? 'Temperature (°C)' : 'Humidity (%)';
-  const yLabel = isFire ? 'Fire Intensity' : 'Fridge Door (0 Closed / 1 Open)';
-  const yDomain = isFire ? ['auto', 'auto'] : [-0.2, 1.2];
 
   return (
     <div className="th-trend-chart-narrow">
@@ -285,15 +197,6 @@ function buildHourlyAverages(history = [], monthValue, dayValue, yKey) {
     hourLabel: `${String(bucket.hour).padStart(2, '0')}:00`,
     [yKey]: bucket.count ? Number((bucket.sum / bucket.count).toFixed(2)) : null,
   }));
-}
-
-function filterHistoryByMonthDay(rows = [], monthValue, dayValue) {
-  return rows.filter((item) => {
-    const date = getHistoryEntryDate(item);
-    if (!date) return false;
-    return String(date.getMonth() + 1).padStart(2, '0') === monthValue
-      && String(date.getDate()).padStart(2, '0') === dayValue;
-  });
 }
 
 const HEATMAP_HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
