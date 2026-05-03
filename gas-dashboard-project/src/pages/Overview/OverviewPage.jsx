@@ -1,106 +1,96 @@
+import { useMemo } from 'react';
 import Panel from '../../components/common/Panel';
 import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
-import AlertsPanel from '../../components/alerts/AlertsPanel';
-import { Shield, Flame, AlertTriangle } from 'lucide-react';
+import GaugeCard from '../../components/charts/GaugeCard';
 import useOverviewData from '../../hooks/useOverviewData';
+import useTempHumData from '../../hooks/useTempHumData';
 
-const metricRows = [
-  { label: '10 min', value: '36 °C' },
-  { label: '20 min', value: '38 °C' },
-  { label: '30 min', value: '39 °C' },
-  { label: '35 min', value: '40 °C' },
-  { label: '39 min', value: '45 °C' },
-];
+function FlameGauge({ value = 0 }) {
+  const clamped = Math.max(0, Math.min(100, Number(value) || 0));
+  const rotation = -90 + (clamped / 100) * 180;
+
+  return (
+    <div className="fire-gauge-card">
+      <h3>Flame Gauge</h3>
+      <div className="fire-gauge">
+        <div className="fire-gauge-ring" />
+        <div className="fire-gauge-needle" style={{ transform: `translateX(-50%) rotate(${rotation}deg)` }} />
+        <div className="fire-gauge-dot" />
+      </div>
+      <div className="fire-gauge-value">{clamped}%</div>
+      <div className="fire-gauge-subtitle">flame_intensity (%)</div>
+    </div>
+  );
+}
+
+function parseDurationSeconds(value) {
+  if (value == null) return 0;
+  const n = Number(value);
+  if (!Number.isNaN(n)) return n;
+  const t = String(value).toLowerCase();
+  const m = [...t.matchAll(/(\d+)\s*(h|m|s)/g)];
+  return m.reduce((acc, x) => acc + Number(x[1]) * (x[2] === 'h' ? 3600 : x[2] === 'm' ? 60 : 1), 0);
+}
+
+function formatClock(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
 
 export default function OverviewPage() {
   const { gas, temp, fridge, fire, loading } = useOverviewData();
+  const { history = [] } = useTempHumData();
 
   if (loading) return <LoadingState label="Loading overview..." />;
-  if (!gas.latest && !temp.latest && !fridge.latest && !fire.latest) {
-    return <EmptyState label="No overview data available." />;
-  }
+  if (!gas.latest && !temp.latest && !fridge.latest && !fire.latest) return <EmptyState label="No overview data available." />;
 
-  const alerts = [
-    ...gas.alerts,
-    ...(fire.latest?.alert_triggered ? [{ title: 'Fire alert triggered', time: fire.latest.date_time, level: fire.latest.alert_level || 'danger' }] : []),
-    ...(temp.latest?.status && temp.latest.status !== 'SAFE' ? [{ title: temp.latest.warning || 'High Temperature Warning', time: `${temp.latest.date} ${temp.latest.time}`, level: temp.latest.status }] : []),
-  ].slice(0, 2);
+  const flameIntensity = fire.latest?.intensity_percent ?? fire.latest?.flame_intensity ?? 18;
+  const doorDuration = useMemo(() => {
+    const seconds = parseDurationSeconds(fridge.latest?.Duration ?? fridge.latest?.duration ?? fridge.analysis?.door_open_duration_sec ?? 0);
+    return formatClock(seconds);
+  }, [fridge]);
+
+  const forecastRows = useMemo(() => {
+    const base = Number(temp.latest?.temperature || 34);
+    return Array.from({ length: 5 }, (_, i) => ({
+      min: `${(i + 1) * 10} min`,
+      value: `${Math.round(base + i + (i > 2 ? 1 : 0))} °C`,
+    }));
+  }, [temp.latest]);
 
   return (
-    <div className="page-grid overview-mock">
-      <div className="overview-top-label">Overall DashBoard</div>
-      <div className="system-banner">
-        <Shield size={14} /> Kitchen Risk status : <strong>SAFE</strong>
-        <span className="system-banner-meta">Last alert Shook : 2 hrs ago</span>
-      </div>
+    <div className="page-grid overview-focus">
+      <div className="dashboard-grid overview-main-cards">
+        <Panel title="Gas Dashboard Gauge">
+          <GaugeCard value={gas.latest?.gasValue || 0} />
+        </Panel>
 
-      <div className="overview-kpi-row">
-        {[
-          { title: 'Humidity', value: `${Math.round(Number(temp.latest?.humidity || 8))}%`, badge: 'OPTIMAL' },
-          { title: 'Temperature', value: `${Math.round(Number(temp.latest?.temperature || 34))}°C`, badge: 'AVERAGE HEAT' },
-          { title: 'Gas Detection', value: (gas.analysis?.final_risk || gas.latest?.status || 'SAFE').toUpperCase(), badge: 'SAFE' },
-          { title: 'Fire Detection', value: fire.latest?.alert_triggered ? 'YES' : 'NO', badge: 'SAFE' },
-          { title: 'Fridge Status', value: fridge.latest?.status === 'OPEN' ? 'Closed' : 'Closed', badge: 'CLOSED' },
-        ].map((card) => (
-          <div className="overview-kpi" key={card.title}>
-            <div className="overview-kpi-title">{card.title}</div>
-            <div className="overview-kpi-value">{card.value}</div>
-            <div className="overview-kpi-badge">{card.badge}</div>
-          </div>
-        ))}
+        <Panel title="Temperature Dashboard Gauge">
+          <div className="gauge-card"><div className="gauge-value">{temp.latest?.temperature ?? '--'}°C</div><div className="gauge-thresholds">Safe &lt; 28 | Warning &lt; 35 | Danger ≥ 35</div></div>
+        </Panel>
 
-        <Panel title="Alerts and Event Logs">
-          <div className="overview-log-list">
-            {(alerts.length ? alerts : [{ title: 'Gas Leak Detected', time: '12.46 P.M' }, { title: 'High Temperature Warning', time: '12.49 P.M' }]).map((a) => (
-              <div key={`${a.title}-${a.time}`} className="overview-log-item">
-                <strong>{a.title}</strong>
-                <span>{a.time}</span>
-              </div>
-            ))}
+        <Panel title="Flame Gauge">
+          <FlameGauge value={flameIntensity} />
+        </Panel>
+
+        <Panel title="Door Opened Duration">
+          <div className="overview-duration-card">
+            <div className="big-number">{doorDuration}</div>
+            <div className="stat-card-subtitle">CURRENT SESSION ELAPSED</div>
           </div>
         </Panel>
       </div>
 
-      <div className="overview-mid-row">
-        <Panel title="Next Hour Temperature Forecast">
-          <div className="forecast-box">
-            <div className="forecast-graph" />
-            <div className="forecast-metrics">{metricRows.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>
-          </div>
-          <div className="overview-pill warning"><AlertTriangle size={16} /> Temperature may reach 38°C within 45 minutes if current trend continuous</div>
-        </Panel>
-
-        <Panel title="Device and System Health">
-          <div className="summary-list compact">
-            <div><strong>ESP32 Connection Status</strong> <span className="chip-tiny">Connected</span></div>
-            <div>Temperature and Humidity Sensor : Normal</div>
-            <div>Gas Detection Sensor : Normal</div>
-            <div>Flame Detection Sensor : Normal</div>
-            <div>Fridge Open/Close Sensor : Normal</div>
-          </div>
-          <div className="panel-foot-text">Wifi strength : Strong</div>
-        </Panel>
-
-        <div className="stack-panels">
-          <Panel title="Current Status">
-            <div className="overview-pill danger"><Flame size={14} /> High Temperature Detected in 45 mins</div>
-            <div className="overview-pill danger"><Flame size={14} /> High Temperature Detected in 45 mins</div>
-          </Panel>
-          <Panel title="Environmental Control Recommendations">
-            <div className="overview-pill warn"><AlertTriangle size={16} /> Increase exhaust fan speed</div>
-            <div className="overview-pill warn"><AlertTriangle size={16} /> Turn on kitchen ventilation system</div>
-          </Panel>
+      <Panel title="Next Hour Temperature Forecast">
+        <div className="forecast-box">
+          <div className="forecast-graph" />
+          <div className="forecast-metrics">{forecastRows.map((r) => <div key={r.min}><span>{r.min}</span><strong>{r.value}</strong></div>)}</div>
         </div>
-      </div>
-
-      <div className="overview-bottom-row">
-        <Panel title="Correlation"><strong>🔥 High Temperature and Rising Gas Levels combined pose a fire Hazard</strong></Panel>
-        <Panel title="Refrigerator Events"><div className="big-number">12m 40s</div></Panel>
-        <Panel title="Data Insights">Fridge opened 15 times today.<br />Gas Level Peaked 350 ppm.<br />High Temperature and Gas detected twice last week.</Panel>
-      </div>
-
-      <div className="footer-strip"><span>ESP32 : ONLINE</span><span>Last Update : 1 min ago</span><span>Wifi strength : Strong</span><span>Date/Time : 14/02/2026 00:12</span></div>
+      </Panel>
     </div>
   );
 }
